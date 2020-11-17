@@ -141,6 +141,10 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
             }
         }
 
+        if (_output.remaining_capacity() == 0) {
+            break;
+        }
+
         min_index = index_queue.top();
     }
 

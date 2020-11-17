@@ -25,7 +25,9 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     , _stream(capacity)
     , outstanding_segments() {}
 
-uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - unwrap(current_ackno, _isn, 0); }
+uint64_t TCPSender::bytes_in_flight() const {
+    return _next_seqno - unwrap(current_ackno, _isn, stream_in().bytes_written());
+}
 
 void TCPSender::fill_window() {
     size_t window_size_to_fill = 0;
@@ -106,7 +108,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     if (ackno - current_ackno > 0) {
         current_ackno = ackno;
     }
-    uint64_t absolute_ackno = unwrap(current_ackno, _isn, 0);
+    uint64_t absolute_ackno = unwrap(current_ackno, _isn, stream_in().bytes_written());
     current_win_size = window_size;
 
     // scan outstanding segments, remove any that have been fully acknowledged
@@ -129,9 +131,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     }
 
     // fill window if there is new space
-    if (current_win_size > 0) {
-        fill_window();
-    }
+    fill_window();
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
@@ -140,8 +140,8 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
     if (_timer.has_expired(ms_since_last_tick)) {
         // Retransmit the earliest (lowest sequence number)
         // segment that hasn’t been fully acknowledged by the TCP receiver.
-        uint64_t lower = unwrap(current_ackno, _isn, 0);
-        uint64_t earliest_seqno = unwrap(current_ackno + current_win_size, _isn, 0);
+        uint64_t lower = unwrap(current_ackno, _isn, stream_in().bytes_written());
+        uint64_t earliest_seqno = unwrap(current_ackno + current_win_size, _isn, stream_in().bytes_written());
         TCPSegment earliest;
         bool find_earliest = false;
 
